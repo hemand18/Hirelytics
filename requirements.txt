@@ -5,4 +5,5 @@ pandas
 numpy
 scikit-learn
 joblib
-# optional, not used yet: xgboost spacy shap mysql-connector-python
+requests
+python-dotenv
