@@ -7,12 +7,18 @@ const tip = { contentStyle: { background: "#0d1030", border: "1px solid #262c5c"
 
 function useFetch(path, deps = []) {
   const [data, setData] = useState(null), [error, setError] = useState("");
-  useEffect(() => { setData(null); api(path).then(setData).catch(() => setError("Could not reach the API. Start the backend with: python app.py")); }, deps);
+  useEffect(() => {
+    setData(null); setError("");
+    api(path).then(setData).catch(() => setError("Could not reach the API. Check VITE_API_URL in Vercel and that the Render service is live."));
+  }, deps);
   return [data, error];
 }
-const Load = ({ d, e }) => (e ? <p className="err">{e}</p> : !d ? <p className="note">Loading…</p> : null);
+const Load = ({ d, e }) => (e ? <p className="err">{e}</p> : !d ? <p className="note">Loading… (the free server may take up to a minute to wake)</p> : null);
+// true only when the response has every field the page needs
+const has = (d, keys) => d && !d.error && keys.every((k) => d[k] !== undefined && d[k] !== null);
+const Bad = () => <p className="err">The backend returned unexpected data. Open /api/overview, /api/salary and /api/meta on your Render URL to check them.</p>;
 
-function Bars({ title, data, x = "name", y = "value", fmt, horizontal = true }) {
+function Bars({ title, data = [], x = "name", y = "value", fmt, horizontal = true }) {
   return (
     <div className="card"><h3>{title}</h3>
       <ResponsiveContainer width="100%" height={Math.max(220, horizontal ? data.length * 32 : 240)}>
@@ -29,14 +35,15 @@ const Head = ({ t, s }) => (<><h2>{t}</h2><p className="sub">{s}</p></>);
 
 function Overview({ market }) {
   const [d, e] = useFetch("/overview");
-  if (!d) return <Load d={d} e={e} />;
+  if (!d || e) return <Load d={d} e={e} />;
+  if (!has(d, ["roles", "locations", "monthly", "total"])) return <Bad />;
   return (<>
-    <Head t="Hiring at a glance" s={`${d.total} job listings analysed · ${market}`} />
+    <Head t="Hiring at a glance" s={`${d.total} job listings analysed · ${market || ""}`} />
     <div className="kpis">
       <div className="kpi"><b>{d.total}</b><span>Listings analysed</span></div>
-      <div className="kpi"><b>{d.roles[0].name}</b><span>Most advertised role</span></div>
-      <div className="kpi"><b>{d.fresher_share}%</b><span>Open to freshers</span></div>
-      <div className="kpi"><b>{d.locations[0].name}</b><span>Top hiring city</span></div>
+      <div className="kpi"><b>{d.roles[0]?.name ?? "-"}</b><span>Most advertised role</span></div>
+      <div className="kpi"><b>{d.fresher_share ?? 0}%</b><span>Open to freshers</span></div>
+      <div className="kpi"><b>{d.locations[0]?.name ?? "-"}</b><span>Top hiring city</span></div>
     </div>
     <div className="grid">
       <div className="card"><h3>Listings posted per month</h3>
@@ -47,7 +54,8 @@ function Overview({ market }) {
 
 function Market() {
   const [d, e] = useFetch("/overview");
-  if (!d) return <Load d={d} e={e} />;
+  if (!d || e) return <Load d={d} e={e} />;
+  if (!has(d, ["companies", "locations", "experience"])) return <Bad />;
   return (<><Head t="Job market analytics" s="Where hiring happens, and at what experience level." />
     <div className="grid"><Bars title="Top hiring companies" data={d.companies} /><Bars title="Jobs by location" data={d.locations} />
       <Bars title="Experience-level distribution" data={d.experience} horizontal={false} /></div></>);
@@ -59,12 +67,14 @@ function Skills({ meta }) {
   return (<><Head t="Skills intelligence" s="Skills most requested in job listings." />
     <div className="card" style={{ marginBottom: 16, maxWidth: 360 }}><label>Job role</label>
       <select value={role} onChange={(x) => setRole(x.target.value)}><option value="">All roles</option>{meta.roles.map((r) => <option key={r}>{r}</option>)}</select></div>
-    {d ? <Bars title={`Skill demand${role ? " · " + role : ""} (share of listings, %)`} data={d} y="share" fmt={(v) => v + "%"} /> : <Load d={d} e={e} />}</>);
+    {e ? <Load d={d} e={e} /> : !d ? <Load d={d} e={e} /> : !Array.isArray(d) ? <Bad />
+      : <Bars title={`Skill demand${role ? " · " + role : ""} (share of listings, %)`} data={d} y="share" fmt={(v) => v + "%"} />}</>);
 }
 
 function Salary() {
   const [d, e] = useFetch("/salary");
-  if (!d) return <Load d={d} e={e} />;
+  if (!d || e) return <Load d={d} e={e} />;
+  if (!has(d, ["by_role", "by_experience", "by_location", "by_company"])) return <Bad />;
   const f = (v) => lpa(v);
   return (<><Head t="Salary insights" s={`Median salary ${lpa(d.median)} · based on ${d.with_salary} listings with disclosed pay (${d.missing} undisclosed, excluded)`} />
     <div className="grid"><Bars title="Median salary by role" data={d.by_role} y="median" fmt={f} />
@@ -85,26 +95,26 @@ function Predict({ meta }) {
       <div className="row">{sel("education", meta.education, "Education")}{sel("employment_type", meta.employment, "Employment type")}</div>
       <label>Years of experience</label><input type="number" min="0" max="30" value={p.experience} onChange={(x) => set("experience", x.target.value)} />
       <label>Skills</label><div className="chips">{meta.skills.map((s) => <button key={s} className={"chip" + (p.skills.includes(s) ? " on" : "")} onClick={() => toggle(s)}>{s}</button>)}</div>
-      <button className="btn" onClick={() => { setErr(""); api("/predict", p).then(setR).catch(() => setErr("Prediction failed. Is the backend running?")); }}>Estimate salary</button>
+      <button className="btn" onClick={() => { setErr(""); setR(null); api("/predict", p).then(setR).catch(() => setErr("Prediction failed. Check that the backend is live.")); }}>Estimate salary</button>
     </div>
     <div className="card"><h3>Estimated range</h3>
-      {r ? <><div className="result">{lpa(r.low)} – {lpa(r.high)}</div><p>Most likely around {lpa(r.mid)}.</p></> : <p className="note">Your estimate will appear here.</p>}
+      {has(r, ["low", "mid", "high"]) ? <><div className="result">{lpa(r.low)} – {lpa(r.high)}</div><p>Most likely around {lpa(r.mid)}.</p></> : <p className="note">Your estimate will appear here.</p>}
       {err && <p className="err">{err}</p>}
-      <p className="note">Model: Random Forest. Test MAE {lpa(meta.metrics.MAE)}, RMSE {lpa(meta.metrics.RMSE)}, R² {meta.metrics.R2.toFixed(2)}. The range is the spread across the model's trees, not a guarantee. Trained on {meta.source.toLowerCase()}.</p></div></div></>);
+      <p className="note">Model: Random Forest. Test MAE {lpa(meta.metrics?.MAE)}, RMSE {lpa(meta.metrics?.RMSE)}, R² {meta.metrics?.R2?.toFixed(2)}. The range is the spread across the model's trees, not a guarantee. Trained on {(meta.source || "").toLowerCase()}.</p></div></div></>);
 }
 
 function Career({ meta }) {
-  const [role, setRole] = useState(meta.roles[0]), [have, setHave] = useState([]), [r, setR] = useState(null);
+  const [role, setRole] = useState(meta.roles[0]), [have, setHave] = useState([]), [r, setR] = useState(null), [err, setErr] = useState("");
   const toggle = (s) => setHave(have.includes(s) ? have.filter((x) => x !== s) : [...have, s]);
   return (<><Head t="Career recommendations" s="Compare your skills with what your target role asks for." />
     <div className="grid"><div className="card"><label>Target role</label>
       <select value={role} onChange={(x) => setRole(x.target.value)}>{meta.roles.map((o) => <option key={o}>{o}</option>)}</select>
       <label>Skills you already have</label><div className="chips">{meta.skills.map((s) => <button key={s} className={"chip" + (have.includes(s) ? " on" : "")} onClick={() => toggle(s)}>{s}</button>)}</div>
-      <button className="btn" onClick={() => api("/skill-gap", { role, skills: have }).then(setR)}>Analyse my skills</button></div>
-      <div className="card"><h3>Your match</h3>{r ? <><div className="result">{r.match}%</div>
+      <button className="btn" onClick={() => { setErr(""); api("/skill-gap", { role, skills: have }).then(setR).catch(() => setErr("Analysis failed. Check that the backend is live.")); }}>Analyse my skills</button></div>
+      <div className="card"><h3>Your match</h3>{has(r, ["match", "missing"]) ? <><div className="result">{r.match}%</div>
         <p>{r.missing.length ? "Learn these next, in this order:" : "You cover every top skill for this role."}</p>
         {r.missing.map((m) => (<div key={m.name} style={{ marginBottom: 10 }}><b>{m.name}</b> <span className="note">asked in {m.share}% of {role} listings</span><div className="bar"><i style={{ width: m.share + "%" }} /></div></div>))}</>
-        : <p className="note">Pick your skills and run the analysis.</p>}</div></div></>);
+        : <p className="note">Pick your skills and run the analysis.</p>}{err && <p className="err">{err}</p>}</div></div></>);
 }
 
 function Explorer({ meta }) {
@@ -115,10 +125,10 @@ function Explorer({ meta }) {
       <div><label>Title or skill</label><input type="text" value={q} onChange={(x) => setQ(x.target.value)} placeholder="e.g. SQL" /></div>
       <div><label>Location</label><select value={loc} onChange={(x) => setLoc(x.target.value)}><option value="">All locations</option>{meta.locations.map((l) => <option key={l}>{l}</option>)}</select></div>
       <div><button className={"chip" + (fr ? " on" : "")} onClick={() => setFr(!fr)}>Freshers only</button></div></div>
-    {d ? <div className="card scroll"><p className="note">{d.count} matching listings (showing latest {d.rows.length})</p>
+    {e || !d ? <Load d={d} e={e} /> : !has(d, ["rows", "count"]) ? <Bad /> : <div className="card scroll"><p className="note">{d.count} matching listings (showing latest {d.rows.length})</p>
       <table><thead><tr><th>Role</th><th>Company</th><th>City</th><th>Exp</th><th>Skills</th><th>Salary</th></tr></thead>
         <tbody>{d.rows.map((j, i) => (<tr key={i}><td>{j.job_title}</td><td>{j.company}</td><td>{j.location}</td><td>{j.experience}y</td><td>{j.skills}</td>
-          <td>{j.salary_min ? `${lpa(j.salary_min)} – ${lpa(j.salary_max)}` : "Not disclosed"}</td></tr>))}</tbody></table></div> : <Load d={d} e={e} />}</>);
+          <td>{j.salary_min ? `${lpa(j.salary_min)} – ${lpa(j.salary_max)}` : "Not disclosed"}</td></tr>))}</tbody></table></div>}</>);
 }
 
 function About({ meta }) {
@@ -132,10 +142,11 @@ function About({ meta }) {
 export default function App() {
   const [page, setPage] = useState(PAGES[0]);
   const [meta, err] = useFetch("/meta");
-  const view = { "Overview": <Overview market={meta?.source} />, "Job Market Analytics": <Market />, "Skills Intelligence": meta && <Skills meta={meta} />,
-    "Salary Insights": <Salary />, "Salary Prediction": meta && <Predict meta={meta} />, "Career Recommendations": meta && <Career meta={meta} />,
-    "Job Explorer": meta && <Explorer meta={meta} />, "About Project": meta && <About meta={meta} /> }[page];
+  const metaOk = has(meta, ["roles", "locations", "education", "employment", "skills", "metrics"]);
+  const view = { "Overview": <Overview market={meta?.source} />, "Job Market Analytics": <Market />, "Skills Intelligence": metaOk && <Skills meta={meta} />,
+    "Salary Insights": <Salary />, "Salary Prediction": metaOk && <Predict meta={meta} />, "Career Recommendations": metaOk && <Career meta={meta} />,
+    "Job Explorer": metaOk && <Explorer meta={meta} />, "About Project": metaOk && <About meta={meta} /> }[page];
   return (<div className="shell"><nav><h1>JobScope <b>AI</b></h1>
     {PAGES.map((p) => <button key={p} className={p === page ? "on" : ""} onClick={() => setPage(p)}>{p}</button>)}</nav>
-    <main>{err ? <p className="err">{err}</p> : meta ? view : <p className="note">Loading…</p>}</main></div>);
+    <main>{err ? <p className="err">{err}</p> : !meta ? <p className="note">Loading… (the free server may take up to a minute to wake)</p> : !metaOk ? <Bad /> : view}</main></div>);
 }
