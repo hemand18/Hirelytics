@@ -14,8 +14,7 @@ def train(df, path=MODEL_PATH):
     X, y = build_features(d), d["salary_mid"]
     # group by company so one company's postings never land in both train and test
     tr, te = next(GroupShuffleSplit(test_size=.2, random_state=42).split(X, y, groups=d["company"]))
-    model = RandomForestRegressor(n_estimators=200, min_samples_leaf=3, random_state=42, n_jobs=-1)
-    model.fit(X.iloc[tr], y.iloc[tr])
+    model = RandomForestRegressor(n_estimators=100, min_samples_leaf=3, random_state=42, n_jobs=1)
     bundle = {"model": model, "columns": list(X.columns),
               "metrics": evaluate(y.iloc[te], model.predict(X.iloc[te])),
               "n_train": len(tr), "n_test": len(te)}
