@@ -1,10 +1,8 @@
 flask
 flask-cors
+gunicorn
 pandas
 numpy
 scikit-learn
 joblib
-xgboost
-spacy
-shap
-mysql-connector-python
+# optional, not used yet: xgboost spacy shap mysql-connector-python
