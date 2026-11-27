@@ -1,9 +1,9 @@
-data/raw/*
-data/processed/*
-!data/**/.gitkeep
-models/*.pkl
 __pycache__/
+*.pyc
 .env
+.venv/
 node_modules/
 frontend/dist/
-.ipynb_checkpoints/
+data/raw/*
+!data/raw/.gitkeep
+*.pkl

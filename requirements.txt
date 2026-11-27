@@ -1,10 +1,10 @@
-fastapi
-uvicorn
+flask
+flask-cors
 pandas
 numpy
 scikit-learn
+joblib
 xgboost
 spacy
 shap
-joblib
 mysql-connector-python
