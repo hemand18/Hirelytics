@@ -134,7 +134,7 @@ function Explorer({ meta }) {
 function About({ meta }) {
   const rows = [["Data source", meta.source], ["Collection year", meta.collected], ["Salary currency", meta.currency], ["Sample size", `${meta.rows} listings`],
     ["Model split", `${meta.n_train} train / ${meta.n_test} test, grouped by company to prevent leakage`]];
-  return (<><Head t="About this project" s="JobScope AI: job market intelligence and salary prediction for Indian job seekers." />
+  return (<><Head t="About this project" s="Hirelytics: job market intelligence and salary prediction for Indian job seekers." />
     <div className="card"><table><tbody>{rows.map(([k, v]) => <tr key={k}><th>{k}</th><td>{v}</td></tr>)}</tbody></table>
       <p className="note">This demo runs on generated data. Put a real dataset at data/processed/jobs.csv (same columns) and delete models/salary_model.pkl to retrain.</p></div></>);
 }
