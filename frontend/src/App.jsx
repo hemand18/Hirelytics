@@ -146,7 +146,7 @@ export default function App() {
   const view = { "Overview": <Overview market={meta?.source} />, "Job Market Analytics": <Market />, "Skills Intelligence": metaOk && <Skills meta={meta} />,
     "Salary Insights": <Salary />, "Salary Prediction": metaOk && <Predict meta={meta} />, "Career Recommendations": metaOk && <Career meta={meta} />,
     "Job Explorer": metaOk && <Explorer meta={meta} />, "About Project": metaOk && <About meta={meta} /> }[page];
-  return (<div className="shell"><nav><h1>JobScope <b>AI</b></h1>
+  return (<div className="shell"><nav><h1>Hirelytics</h1>
     {PAGES.map((p) => <button key={p} className={p === page ? "on" : ""} onClick={() => setPage(p)}>{p}</button>)}</nav>
     <main>{err ? <p className="err">{err}</p> : !meta ? <p className="note">Loading… (the free server may take up to a minute to wake)</p> : !metaOk ? <Bad /> : view}</main></div>);
 }
